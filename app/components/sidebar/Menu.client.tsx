@@ -12,6 +12,7 @@ import { ThemeSwitch } from '~/components/ui/ThemeSwitch';
 import { useSearchFilter } from '~/lib/hooks/useSearchFilter';
 import { db, deleteById, getAll, chatId, type ChatHistoryItem, useChatHistory } from '~/lib/persistence';
 import { profileStore } from '~/lib/stores/profile';
+import { sidebarOpenStore } from '~/lib/stores/sidebarMenu';
 import { classNames } from '~/utils/classNames';
 import { cubicEasingFn } from '~/utils/easings';
 
@@ -19,7 +20,7 @@ const menuVariants = {
   closed: {
     opacity: 0,
     visibility: 'hidden',
-    left: '-340px',
+    left: '-100vw',
     transition: {
       duration: 0.2,
       ease: cubicEasingFn,
@@ -38,6 +39,8 @@ const menuVariants = {
 
 type DialogContent =
   { type: 'delete'; item: ChatHistoryItem } | { type: 'bulkDelete'; items: ChatHistoryItem[] } | null;
+
+const setOpen = (value: boolean) => sidebarOpenStore.set(value);
 
 function CurrentDateTime() {
   const [dateTime, setDateTime] = useState(new Date());
@@ -65,7 +68,7 @@ export const Menu = () => {
   const { duplicateCurrentChat, exportChat } = useChatHistory();
   const menuRef = useRef<HTMLDivElement>(null);
   const [list, setList] = useState<ChatHistoryItem[]>([]);
-  const [open, setOpen] = useState(false);
+  const open = useStore(sidebarOpenStore);
   const [dialogContent, setDialogContent] = useState<DialogContent>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const profile = useStore(profileStore);
@@ -279,6 +282,11 @@ export const Menu = () => {
   }, [open, selectionMode]);
 
   useEffect(() => {
+    // Hover-Öffnen nur für Geräte mit Maus. Auf Touch-Geräten öffnet der Menü-Button im Header das Menü.
+    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+      return undefined;
+    }
+
     const enterThreshold = 20;
     const exitThreshold = 20;
 
@@ -324,12 +332,14 @@ export const Menu = () => {
 
   return (
     <>
+      {/* Abdunklung hinter dem Menü: Tippen schließt das Menü (nur Touch/kleine Bildschirme) */}
+      {open && <div className="fixed inset-0 bg-black/50 lg:hidden z-sidebar" onClick={() => setOpen(false)} />}
       <motion.div
         ref={menuRef}
         initial="closed"
         animate={open ? 'open' : 'closed'}
         variants={menuVariants}
-        style={{ width: '340px' }}
+        style={{ width: 'min(340px, 88vw)' }}
         className={classNames(
           'flex selection-accent flex-col side-menu fixed top-0 h-full rounded-r-2xl',
           'bg-white dark:bg-gray-950 border-r border-bolt-elements-borderColor',
@@ -338,7 +348,16 @@ export const Menu = () => {
         )}
       >
         <div className="h-12 flex items-center justify-between px-4 border-b border-gray-100 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-900/50 rounded-tr-2xl">
-          <div className="text-gray-900 dark:text-white font-medium"></div>
+          <div className="text-gray-900 dark:text-white font-medium">
+            <button
+              type="button"
+              aria-label="Menü schließen"
+              onClick={() => setOpen(false)}
+              className="lg:hidden flex items-center justify-center w-11 h-11 -ml-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              <span className="i-ph:x text-2xl" />
+            </button>
+          </div>
           <div className="flex items-center gap-3">
             <HelpButton onClick={() => window.open('https://stackblitz-labs.github.io/bolt.diy/', '_blank')} />
             <span className="font-medium text-sm text-gray-900 dark:text-white truncate">
