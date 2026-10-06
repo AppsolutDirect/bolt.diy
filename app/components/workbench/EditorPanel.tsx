@@ -17,6 +17,7 @@ import {
 } from '~/components/editor/codemirror/CodeMirrorEditor';
 import { PanelHeader } from '~/components/ui/PanelHeader';
 import { PanelHeaderButton } from '~/components/ui/PanelHeaderButton';
+import useViewport from '~/lib/hooks';
 import type { FileMap } from '~/lib/stores/files';
 import { themeStore } from '~/lib/stores/theme';
 import { workbenchStore } from '~/lib/stores/workbench';
@@ -63,6 +64,9 @@ export const EditorPanel = memo(
     const theme = useStore(themeStore);
     const showTerminal = useStore(workbenchStore.showTerminal);
 
+    // Auf Smartphones/Tablets: Dateibaum oben, Editor darunter (statt nebeneinander)
+    const isSmallViewport = useViewport(1024);
+
     const activeFileSegments = useMemo(() => {
       if (!editorDocument) {
         return undefined;
@@ -82,9 +86,18 @@ export const EditorPanel = memo(
 
     return (
       <Group orientation="vertical">
-        <Panel defaultSize={showTerminal ? DEFAULT_EDITOR_SIZE : 100} minSize={20}>
-          <Group orientation="horizontal">
-            <Panel defaultSize={20} minSize={15} collapsible className="border-r border-bolt-elements-borderColor">
+        <Panel defaultSize={showTerminal ? `${DEFAULT_EDITOR_SIZE}%` : '100%'} minSize="20%">
+          <Group key={isSmallViewport ? 'stacked' : 'side-by-side'} orientation={isSmallViewport ? 'vertical' : 'horizontal'}>
+            <Panel
+              defaultSize={isSmallViewport ? '35%' : '20%'}
+              minSize="15%"
+              collapsible
+              className={
+                isSmallViewport
+                  ? 'border-b border-bolt-elements-borderColor'
+                  : 'border-r border-bolt-elements-borderColor'
+              }
+            >
               <div className="h-full">
                 <Tabs.Root defaultValue="files" className="flex flex-col h-full">
                   <PanelHeader className="w-full text-sm font-medium text-bolt-elements-textSecondary px-1">
@@ -143,7 +156,7 @@ export const EditorPanel = memo(
             </Panel>
 
             <Separator />
-            <Panel className="flex flex-col" defaultSize={80} minSize={20}>
+            <Panel className="flex flex-col" defaultSize={isSmallViewport ? '65%' : '80%'} minSize="20%">
               <PanelHeader className="overflow-x-auto">
                 {activeFileSegments?.length && (
                   <div className="flex items-center flex-1 text-sm">
