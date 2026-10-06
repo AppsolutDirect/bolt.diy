@@ -90,7 +90,7 @@ export const TerminalTabs = memo(() => {
     if (!showTerminal && !isCollapsed) {
       terminal.collapse();
     } else if (showTerminal && isCollapsed) {
-      terminal.resize(DEFAULT_TERMINAL_SIZE);
+      terminal.resize(`${DEFAULT_TERMINAL_SIZE}%`);
     }
 
     terminalToggledByShortcut.current = false;
@@ -116,8 +116,8 @@ export const TerminalTabs = memo(() => {
   return (
     <Panel
       panelRef={terminalPanelRef}
-      defaultSize={showTerminal ? DEFAULT_TERMINAL_SIZE : 0}
-      minSize={10}
+      defaultSize={showTerminal ? `${DEFAULT_TERMINAL_SIZE}%` : '0%'}
+      minSize="10%"
       collapsible
       onResize={() => {
         if (terminalToggledByShortcut.current) {
