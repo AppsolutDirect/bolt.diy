@@ -3,40 +3,54 @@ import { ClientOnly } from 'remix-utils/client-only';
 import { HeaderActionButtons } from './HeaderActionButtons.client';
 import { ChatDescription } from '~/lib/persistence/ChatDescription.client';
 import { chatStore } from '~/lib/stores/chat';
+import { sidebarOpenStore } from '~/lib/stores/sidebarMenu';
 import { classNames } from '~/utils/classNames';
 
 export function Header() {
   const chat = useStore(chatStore);
+  const menuOpen = useStore(sidebarOpenStore);
 
   return (
     <header
-      className={classNames('flex items-center px-4 border-b h-[var(--header-height)]', {
+      className={classNames('flex items-center gap-2 px-3 sm:px-4 border-b h-[var(--header-height)]', {
         'border-transparent': !chat.started,
         'border-bolt-elements-borderColor': chat.started,
       })}
     >
-      <div className="flex items-center gap-2 z-logo text-bolt-elements-textPrimary cursor-pointer">
-        <div className="i-ph:sidebar-simple-duotone text-xl" />
+      <div className="flex items-center z-logo text-bolt-elements-textPrimary">
         <a href="/" className="text-2xl font-semibold text-accent flex items-center">
           {/* <span className="i-bolt:logo-text?mask w-[46px] inline-block" /> */}
           <img src="/logo-light-styled.png" alt="logo" className="w-[90px] inline-block dark:hidden" />
           <img src="/logo-dark-styled.png" alt="logo" className="w-[90px] inline-block hidden dark:block" />
         </a>
       </div>
-      {chat.started && ( // Display ChatDescription and HeaderActionButtons only when the chat has started.
+      {chat.started ? ( // ChatDescription und HeaderActionButtons nur anzeigen, wenn der Chat gestartet ist.
         <>
-          <span className="flex-1 px-4 truncate text-center text-bolt-elements-textPrimary">
+          <span className="flex-1 min-w-0 px-2 sm:px-4 truncate text-center text-bolt-elements-textPrimary">
             <ClientOnly>{() => <ChatDescription />}</ClientOnly>
           </span>
           <ClientOnly>
             {() => (
-              <div className="">
+              <div className="shrink-0">
                 <HeaderActionButtons chatStarted={chat.started} />
               </div>
             )}
           </ClientOnly>
         </>
+      ) : (
+        <div className="flex-1" />
       )}
+
+      {/* Menü-Button: rechts oben, groß genug für den Finger (48x48 px) */}
+      <button
+        type="button"
+        aria-label="Menü öffnen"
+        aria-expanded={menuOpen}
+        onClick={() => sidebarOpenStore.set(!sidebarOpenStore.get())}
+        className="z-logo shrink-0 flex items-center justify-center w-12 h-12 -mr-1 rounded-xl text-bolt-elements-textPrimary hover:bg-bolt-elements-item-backgroundActive active:bg-bolt-elements-item-backgroundActive transition-colors"
+      >
+        <div className="i-ph:list text-3xl" />
+      </button>
     </header>
   );
 }
