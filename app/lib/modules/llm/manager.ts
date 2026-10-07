@@ -13,6 +13,9 @@ const logger = createScopedLogger('LLMManager');
  */
 const ENABLED_PROVIDERS = new Set(['OpenRouter', 'Anthropic', 'OpenAI', 'Google']);
 
+// Reihenfolge in der Anbieter-Auswahl: OpenRouter zuerst
+const PROVIDER_ORDER = ['OpenRouter', 'Anthropic', 'Google', 'OpenAI'];
+
 export class LLMManager {
   private static _instance: LLMManager;
   private _providers: Map<string, BaseProvider> = new Map();
@@ -84,7 +87,14 @@ export class LLMManager {
   }
 
   getAllProviders(): BaseProvider[] {
-    return Array.from(this._providers.values());
+    const rank = (name: string) => {
+      const index = PROVIDER_ORDER.indexOf(name);
+
+      return index === -1 ? PROVIDER_ORDER.length : index;
+    };
+
+    // Array.sort ist stabil: unbekannte Anbieter behalten ihre Reihenfolge und stehen am Ende
+    return Array.from(this._providers.values()).sort((a, b) => rank(a.name) - rank(b.name));
   }
 
   getModelList(): ModelInfo[] {
