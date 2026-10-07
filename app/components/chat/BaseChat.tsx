@@ -140,15 +140,56 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     const [modelList, setModelList] = useState<ModelInfo[]>([]);
     const [isModelSettingsCollapsed, setIsModelSettingsCollapsed] = useState(true);
 
-    // Eingabebereich beim Wischen/Scrollen ausblenden, beim Loslassen wieder einblenden
+    /*
+     * Eingabebereich beim Wischen/Scrollen nach unten aus dem Bild schieben und
+     * nach dem Loslassen (mit kurzer Verzögerung) wieder hereinschieben.
+     *
+     * 'idle'  = sichtbar
+     * 'out'   = gleitet gerade nach unten weg
+     * 'gone'  = komplett weg (aus dem Layout entfernt, Text nutzt die volle Höhe)
+     * 'in'    = gleitet gerade wieder herein
+     */
     const inputContainerRef = React.useRef<HTMLDivElement>(null);
-    const [hideInput, setHideInput] = useState(false);
+    const inputInnerRef = React.useRef<HTMLDivElement>(null);
+    const [inputAnim, setInputAnim] = useState<'idle' | 'out' | 'gone' | 'in'>('idle');
+    const [inputHeight, setInputHeight] = useState(0);
+    const inputCollapsed = inputAnim === 'out' || inputAnim === 'gone';
+
+    // Höhe des Eingabebereichs messen (wird für Animation und Platzfreigabe gebraucht)
+    useEffect(() => {
+      const element = inputInnerRef.current;
+
+      if (!element || typeof ResizeObserver === 'undefined') {
+        return undefined;
+      }
+
+      const update = () => {
+        const height = element.offsetHeight;
+
+        if (height > 0) {
+          setInputHeight(height);
+        }
+      };
+
+      update();
+
+      const observer = new ResizeObserver(update);
+      observer.observe(element);
+
+      return () => observer.disconnect();
+    }, []);
 
     useEffect(() => {
+      if (!chatStarted) {
+        return undefined;
+      }
+
       let startY = 0;
       let startedInsideInput = false;
+      let showTimer: ReturnType<typeof setTimeout> | undefined;
 
       const onTouchStart = (event: TouchEvent) => {
+        clearTimeout(showTimer);
         startY = event.touches[0]?.clientY ?? 0;
         startedInsideInput = !!inputContainerRef.current?.contains(event.target as Node);
       };
@@ -162,11 +203,19 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
         const currentY = event.touches[0]?.clientY ?? 0;
 
         if (Math.abs(currentY - startY) > 8) {
-          setHideInput(true);
+          clearTimeout(showTimer);
+          setInputAnim((state) => (state === 'idle' || state === 'in' ? 'out' : state));
         }
       };
 
-      const onTouchEnd = () => setHideInput(false);
+      const onTouchEnd = () => {
+        clearTimeout(showTimer);
+
+        // kurze Verzögerung, dann wieder einblenden
+        showTimer = setTimeout(() => {
+          setInputAnim((state) => (state === 'out' || state === 'gone' ? 'in' : state));
+        }, 250);
+      };
 
       document.addEventListener('touchstart', onTouchStart, { passive: true });
       document.addEventListener('touchmove', onTouchMove, { passive: true });
@@ -174,12 +223,13 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       document.addEventListener('touchcancel', onTouchEnd, { passive: true });
 
       return () => {
+        clearTimeout(showTimer);
         document.removeEventListener('touchstart', onTouchStart);
         document.removeEventListener('touchmove', onTouchMove);
         document.removeEventListener('touchend', onTouchEnd);
         document.removeEventListener('touchcancel', onTouchEnd);
       };
-    }, []);
+    }, [chatStarted]);
     const [isListening, setIsListening] = useState(false);
     const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
     const [transcript, setTranscript] = useState('');
@@ -428,16 +478,53 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                 </ClientOnly>
                 <ScrollToBottom />
               </StickToBottom.Content>
+              <style>{`
+                @keyframes bolt-input-out {
+                  from { transform: translateY(0); }
+                  to { transform: translateY(calc(var(--bolt-input-h) + 1rem)); }
+                }
+                @keyframes bolt-input-in {
+                  from { transform: translateY(calc(var(--bolt-input-h) + 1rem)); }
+                  to { transform: translateY(0); }
+                }
+              `}</style>
               <div
                 ref={inputContainerRef}
-                className={classNames(
-                  'my-auto flex flex-col gap-2 w-full max-w-chat mx-auto z-prompt mb-6 transition-all duration-200',
-                  {
-                    'sticky bottom-2': chatStarted,
-                    'translate-y-[130%] opacity-0 pointer-events-none': chatStarted && hideInput,
-                  },
-                )}
+                className={classNames('my-auto w-full max-w-chat mx-auto z-prompt', {
+                  'sticky bottom-2': chatStarted,
+                })}
+                style={
+                  chatStarted && inputHeight > 0
+                    ? {
+                        height: inputCollapsed ? 0 : inputHeight,
+                        transition: inputAnim === 'idle' ? 'none' : 'height 180ms ease-out',
+                      }
+                    : undefined
+                }
               >
+                <div
+                  ref={inputInnerRef}
+                  className="flex flex-col gap-2 pb-6"
+                  style={
+                    {
+                      '--bolt-input-h': `${inputHeight}px`,
+                      animation:
+                        inputAnim === 'out'
+                          ? 'bolt-input-out 180ms ease-out forwards'
+                          : inputAnim === 'in'
+                            ? 'bolt-input-in 180ms ease-out'
+                            : undefined,
+                      display: inputAnim === 'gone' ? 'none' : undefined,
+                    } as React.CSSProperties
+                  }
+                  onAnimationEnd={(event) => {
+                    if (event.animationName === 'bolt-input-out') {
+                      setInputAnim('gone');
+                    } else if (event.animationName === 'bolt-input-in') {
+                      setInputAnim('idle');
+                    }
+                  }}
+                >
                 <div className="flex flex-col gap-2">
                   {deployAlert && (
                     <DeployChatAlert
@@ -515,6 +602,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   setSelectedElement={setSelectedElement}
                   onWebSearchResult={onWebSearchResult}
                 />
+                </div>
               </div>
             </StickToBottom>
             <div className="flex flex-col justify-center">
