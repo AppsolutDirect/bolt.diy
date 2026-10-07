@@ -260,8 +260,8 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
             />
           )}
         </ClientOnly>
-        <div className="flex justify-between items-center text-sm p-4 pt-2">
-          <div className="flex gap-1 items-center">
+        <div className="flex justify-between items-center gap-2 text-sm p-2 sm:p-4 pt-2">
+          <div className="flex flex-wrap gap-1 items-center min-w-0">
             <ColorSchemeDialog designScheme={props.designScheme} setDesignScheme={props.setDesignScheme} />
             <McpTools />
             <IconButton title="Upload file" className="transition-all" onClick={() => props.handleFileUpload()}>
@@ -307,23 +307,31 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
                 {props.chatMode === 'discuss' ? <span>Discuss</span> : <span />}
               </IconButton>
             )}
-            <IconButton
-              title="Model Settings"
-              className={classNames('transition-all flex items-center gap-1', {
-                'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent':
-                  props.isModelSettingsCollapsed,
-                'bg-bolt-elements-item-backgroundDefault text-bolt-elements-item-contentDefault':
-                  !props.isModelSettingsCollapsed,
-              })}
-              onClick={() => props.setIsModelSettingsCollapsed(!props.isModelSettingsCollapsed)}
-              disabled={!props.providerList || props.providerList.length === 0}
-            >
-              <div className={`i-ph:caret-${props.isModelSettingsCollapsed ? 'right' : 'down'} text-lg`} />
-              {props.isModelSettingsCollapsed ? <span className="text-xs">{props.model}</span> : <span />}
-            </IconButton>
           </div>
+          <IconButton
+            title="Modell und Anbieter"
+            className={classNames('transition-all flex items-center gap-1 shrink-0 ml-auto', {
+              'bg-bolt-elements-item-backgroundAccent text-bolt-elements-item-contentAccent':
+                props.isModelSettingsCollapsed,
+              'bg-bolt-elements-item-backgroundDefault text-bolt-elements-item-contentDefault':
+                !props.isModelSettingsCollapsed,
+            })}
+            onClick={() => props.setIsModelSettingsCollapsed(!props.isModelSettingsCollapsed)}
+            disabled={!props.providerList || props.providerList.length === 0}
+          >
+            {props.isModelSettingsCollapsed ? (
+              <div className="i-ph:caret-up text-lg" />
+            ) : (
+              <div className="i-ph:caret-down text-lg" />
+            )}
+            {props.isModelSettingsCollapsed ? (
+              <span className="text-xs truncate max-w-[30vw] sm:max-w-none">{props.model}</span>
+            ) : (
+              <span />
+            )}
+          </IconButton>
           {props.input.length > 3 ? (
-            <div className="text-xs text-bolt-elements-textTertiary">
+            <div className="hidden sm:block text-xs text-bolt-elements-textTertiary">
               Use <kbd className="kdb px-1.5 py-0.5 rounded bg-bolt-elements-background-depth-2">Shift</kbd> +{' '}
               <kbd className="kdb px-1.5 py-0.5 rounded bg-bolt-elements-background-depth-2">Return</kbd> a new line
             </div>
