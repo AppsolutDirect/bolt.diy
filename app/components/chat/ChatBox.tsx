@@ -69,7 +69,7 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
   return (
     <div
       className={classNames(
-        'relative bg-bolt-elements-background-depth-2 backdrop-blur p-3 rounded-lg border border-bolt-elements-borderColor relative w-full max-w-chat mx-auto z-prompt',
+        'relative bg-bolt-elements-background-depth-2 backdrop-blur px-1.5 py-0 rounded-lg border border-bolt-elements-borderColor relative w-full max-w-chat mx-auto z-prompt',
 
         /*
          * {
@@ -78,6 +78,14 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
          */
       )}
     >
+      <style>{`
+        .bolt-input-toolbar { scrollbar-width: none; }
+        .bolt-input-toolbar::-webkit-scrollbar { display: none; }
+        .bolt-input-toolbar button { padding: 0.125rem !important; }
+        .bolt-input-toolbar [class*="i-ph:"],
+        .bolt-input-toolbar [class*="i-bolt:"],
+        .bolt-input-toolbar [class*="i-svg-spinners:"] { font-size: 1rem !important; }
+      `}</style>
       <svg className={classNames(styles.PromptEffectContainer)}>
         <defs>
           <linearGradient
@@ -174,7 +182,7 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
         <textarea
           ref={props.textareaRef}
           className={classNames(
-            'w-full pl-4 pt-4 pr-16 outline-none resize-none text-bolt-elements-textPrimary placeholder-bolt-elements-textTertiary bg-transparent text-sm',
+            'w-full pl-3 pt-3 pr-16 outline-none resize-none text-bolt-elements-textPrimary placeholder-bolt-elements-textTertiary bg-transparent text-[0.8125rem] sm:text-sm leading-snug',
             'transition-all duration-200',
             'hover:border-bolt-elements-focus',
           )}
@@ -260,12 +268,12 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
             />
           )}
         </ClientOnly>
-        <div className="flex justify-between items-center gap-2 text-sm p-2 sm:p-4 pt-2">
-          <div className="flex flex-wrap gap-1 items-center min-w-0">
+        <div className="flex justify-between items-center gap-1 text-sm px-2 py-1 sm:p-4 sm:pt-2">
+          <div className="bolt-input-toolbar flex flex-nowrap gap-0.5 items-center min-w-0 overflow-x-auto">
             <ColorSchemeDialog designScheme={props.designScheme} setDesignScheme={props.setDesignScheme} />
             <McpTools />
             <IconButton title="Upload file" className="transition-all" onClick={() => props.handleFileUpload()}>
-              <div className="i-ph:paperclip text-xl"></div>
+              <div className="i-ph:paperclip text-base"></div>
             </IconButton>
             <WebSearch onSearchResult={(result) => props.onWebSearchResult?.(result)} disabled={props.isStreaming} />
             <IconButton
@@ -278,9 +286,9 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
               }}
             >
               {props.enhancingPrompt ? (
-                <div className="i-svg-spinners:90-ring-with-bg text-bolt-elements-loader-progress text-xl animate-spin"></div>
+                <div className="i-svg-spinners:90-ring-with-bg text-bolt-elements-loader-progress text-base animate-spin"></div>
               ) : (
-                <div className="i-bolt:stars text-xl"></div>
+                <div className="i-bolt:stars text-base"></div>
               )}
             </IconButton>
 
@@ -303,7 +311,7 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
                   props.setChatMode?.(props.chatMode === 'discuss' ? 'build' : 'discuss');
                 }}
               >
-                <div className={`i-ph:chats text-xl`} />
+                <div className={`i-ph:chats text-base`} />
                 {props.chatMode === 'discuss' ? <span>Discuss</span> : <span />}
               </IconButton>
             )}
@@ -320,9 +328,9 @@ export const ChatBox: React.FC<ChatBoxProps> = (props) => {
             disabled={!props.providerList || props.providerList.length === 0}
           >
             {props.isModelSettingsCollapsed ? (
-              <div className="i-ph:caret-up text-lg" />
+              <div className="i-ph:caret-up text-base" />
             ) : (
-              <div className="i-ph:caret-down text-lg" />
+              <div className="i-ph:caret-down text-base" />
             )}
             {props.isModelSettingsCollapsed ? (
               <span className="text-xs truncate max-w-[30vw] sm:max-w-none">{props.model}</span>
