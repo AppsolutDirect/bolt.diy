@@ -138,7 +138,48 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
     const [apiKeys, setApiKeys] = useState<Record<string, string>>(getApiKeysFromCookies());
     const [modelList, setModelList] = useState<ModelInfo[]>([]);
-    const [isModelSettingsCollapsed, setIsModelSettingsCollapsed] = useState(false);
+    const [isModelSettingsCollapsed, setIsModelSettingsCollapsed] = useState(true);
+
+    // Eingabebereich beim Wischen/Scrollen ausblenden, beim Loslassen wieder einblenden
+    const inputContainerRef = React.useRef<HTMLDivElement>(null);
+    const [hideInput, setHideInput] = useState(false);
+
+    useEffect(() => {
+      let startY = 0;
+      let startedInsideInput = false;
+
+      const onTouchStart = (event: TouchEvent) => {
+        startY = event.touches[0]?.clientY ?? 0;
+        startedInsideInput = !!inputContainerRef.current?.contains(event.target as Node);
+      };
+
+      const onTouchMove = (event: TouchEvent) => {
+        // Wischen im Eingabebereich selbst (z.B. beim Tippen) blendet nichts aus
+        if (startedInsideInput) {
+          return;
+        }
+
+        const currentY = event.touches[0]?.clientY ?? 0;
+
+        if (Math.abs(currentY - startY) > 8) {
+          setHideInput(true);
+        }
+      };
+
+      const onTouchEnd = () => setHideInput(false);
+
+      document.addEventListener('touchstart', onTouchStart, { passive: true });
+      document.addEventListener('touchmove', onTouchMove, { passive: true });
+      document.addEventListener('touchend', onTouchEnd, { passive: true });
+      document.addEventListener('touchcancel', onTouchEnd, { passive: true });
+
+      return () => {
+        document.removeEventListener('touchstart', onTouchStart);
+        document.removeEventListener('touchmove', onTouchMove);
+        document.removeEventListener('touchend', onTouchEnd);
+        document.removeEventListener('touchcancel', onTouchEnd);
+      };
+    }, []);
     const [isListening, setIsListening] = useState(false);
     const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
     const [transcript, setTranscript] = useState('');
@@ -388,9 +429,14 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                 <ScrollToBottom />
               </StickToBottom.Content>
               <div
-                className={classNames('my-auto flex flex-col gap-2 w-full max-w-chat mx-auto z-prompt mb-6', {
-                  'sticky bottom-2': chatStarted,
-                })}
+                ref={inputContainerRef}
+                className={classNames(
+                  'my-auto flex flex-col gap-2 w-full max-w-chat mx-auto z-prompt mb-6 transition-all duration-200',
+                  {
+                    'sticky bottom-2': chatStarted,
+                    'translate-y-[130%] opacity-0 pointer-events-none': chatStarted && hideInput,
+                  },
+                )}
               >
                 <div className="flex flex-col gap-2">
                   {deployAlert && (
