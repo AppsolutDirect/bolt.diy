@@ -463,7 +463,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   {() => {
                     return chatStarted ? (
                       <Messages
-                        className="flex flex-col w-full flex-1 max-w-chat pb-4 mx-auto z-1"
+                        className="flex flex-col w-full flex-1 max-w-chat pb-4 mx-auto z-1 text-[0.9rem] sm:text-base"
                         messages={messages}
                         isStreaming={isStreaming}
                         append={append}
