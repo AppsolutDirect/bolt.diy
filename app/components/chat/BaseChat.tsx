@@ -152,6 +152,37 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     const [inputAnim, setInputAnim] = useState<'idle' | 'out' | 'gone' | 'in'>('idle');
     const [inputHeight, setInputHeight] = useState(0);
     const [slideDistance, setSlideDistance] = useState(0);
+
+    /*
+     * Sicherheitsnetz für die Android-Bildschirmtastatur: Überdeckt die Tastatur den
+     * Eingabebereich (Browser ohne "interactive-widget=resizes-content"), wird er genau
+     * um die Tastaturhöhe nach oben verschoben und fährt beim Schließen wieder nach unten.
+     */
+    const [keyboardOffset, setKeyboardOffset] = useState(0);
+
+    useEffect(() => {
+      const viewport = window.visualViewport;
+
+      if (!viewport) {
+        return undefined;
+      }
+
+      const update = () => {
+        const offset = Math.round(window.innerHeight - viewport.height - viewport.offsetTop);
+
+        // kleine Abweichungen (Adressleiste etc.) ignorieren
+        setKeyboardOffset(offset > 80 ? offset : 0);
+      };
+
+      update();
+      viewport.addEventListener('resize', update);
+      viewport.addEventListener('scroll', update);
+
+      return () => {
+        viewport.removeEventListener('resize', update);
+        viewport.removeEventListener('scroll', update);
+      };
+    }, []);
     const inputCollapsed = inputAnim === 'out' || inputAnim === 'gone';
 
     // Höhe des Eingabebereichs messen (wird für Animation und Platzfreigabe gebraucht)
@@ -489,14 +520,16 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                 className={classNames('mt-auto w-full max-w-chat mx-auto z-prompt', {
                   'sticky bottom-0': chatStarted,
                 })}
-                style={
-                  chatStarted && inputHeight > 0
-                    ? {
-                        height: inputCollapsed ? 0 : inputHeight,
-                        transition: inputAnim === 'idle' ? 'none' : 'height 180ms ease-out',
-                      }
-                    : undefined
-                }
+                style={{
+                  ...(chatStarted && inputHeight > 0 ? { height: inputCollapsed ? 0 : inputHeight } : {}),
+                  transform: keyboardOffset > 0 ? `translateY(-${keyboardOffset}px)` : undefined,
+                  transition: [
+                    chatStarted && inputHeight > 0 && inputAnim !== 'idle' ? 'height 180ms ease-out' : '',
+                    'transform 120ms ease-out',
+                  ]
+                    .filter(Boolean)
+                    .join(', '),
+                }}
               >
                 <div
                   ref={inputInnerRef}
