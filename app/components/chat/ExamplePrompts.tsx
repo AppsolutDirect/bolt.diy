@@ -11,14 +11,15 @@ const EXAMPLE_PROMPTS = [
 
 export function ExamplePrompts(sendMessage?: { (event: React.UIEvent, messageInput?: string): void | undefined }) {
   return (
-    <div id="examples" className="relative flex flex-col gap-9 w-full max-w-3xl mx-auto flex justify-center mt-6">
+    <div id="examples" className="relative flex justify-center w-full max-w-3xl mx-auto mt-0 mb-1">
       <div
         className="flex flex-wrap justify-center gap-2"
         style={{
           animation: '.25s ease-out 0s 1 _fade-and-move-in_g2ptj_1 forwards',
         }}
       >
-        {EXAMPLE_PROMPTS.map((examplePrompt, index: number) => {
+        {/* Nur der oberste Beispiel-Prompt wird angezeigt */}
+        {EXAMPLE_PROMPTS.slice(0, 1).map((examplePrompt, index: number) => {
           return (
             <button
               key={index}
