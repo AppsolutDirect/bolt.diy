@@ -12,14 +12,11 @@ import { getApiKeysFromCookies } from './APIKeyManager';
 import styles from './BaseChat.module.scss';
 import ChatAlert from './ChatAlert';
 import { ChatBox } from './ChatBox';
-import GitCloneButton from './GitCloneButton';
 import LlmErrorAlert from './LLMApiAlert';
 import { Messages } from './Messages.client';
 import ProgressCompilation from './ProgressCompilation';
-import StarterTemplates from './StarterTemplates';
 import { ExamplePrompts } from '~/components/chat/ExamplePrompts';
 import { SupabaseChatAlert } from '~/components/chat/SupabaseAlert';
-import { ImportButtons } from '~/components/chat/chatExportAndImport/ImportButtons';
 import DeployChatAlert from '~/components/deploy/DeployAlert';
 import { Menu } from '~/components/sidebar/Menu.client';
 import type { ElementInfo } from '~/components/workbench/Inspector';
@@ -138,7 +135,205 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
     const [apiKeys, setApiKeys] = useState<Record<string, string>>(getApiKeysFromCookies());
     const [modelList, setModelList] = useState<ModelInfo[]>([]);
-    const [isModelSettingsCollapsed, setIsModelSettingsCollapsed] = useState(false);
+    const [isModelSettingsCollapsed, setIsModelSettingsCollapsed] = useState(true);
+
+    /*
+     * Eingabebereich (samt Buttons) bei einem Tippen AUSSERHALB des Containers
+     * nach unten aus dem Bild schieben und bei dem nächsten Tippen irgendwo
+     * wieder hereinschieben.
+     *
+     * 'idle'  = sichtbar
+     * 'out'   = gleitet gerade nach unten weg
+     * 'gone'  = komplett weg
+     * 'in'    = gleitet gerade wieder herein
+     */
+    const inputContainerRef = React.useRef<HTMLDivElement>(null);
+    const inputInnerRef = React.useRef<HTMLDivElement>(null);
+    const [inputAnim, setInputAnim] = useState<'idle' | 'out' | 'gone' | 'in'>('idle');
+    const [inputHeight, setInputHeight] = useState(0);
+    const [slideDistance, setSlideDistance] = useState(0);
+
+    /*
+     * Sicherheitsnetz für die Android-Bildschirmtastatur: Überdeckt die Tastatur den
+     * Eingabebereich (Browser ohne "interactive-widget=resizes-content"), wird er genau
+     * um die Tastaturhöhe nach oben verschoben und fährt beim Schließen wieder nach unten.
+     */
+    const [keyboardOffset, setKeyboardOffset] = useState(0);
+
+    useEffect(() => {
+      const viewport = window.visualViewport;
+
+      if (!viewport) {
+        return undefined;
+      }
+
+      const update = () => {
+        const offset = Math.round(window.innerHeight - viewport.height - viewport.offsetTop);
+
+        // kleine Abweichungen (Adressleiste etc.) ignorieren
+        setKeyboardOffset(offset > 80 ? offset : 0);
+      };
+
+      // Manche Android-Tastaturen melden ihre Größe verspätet: mehrfach nachmessen
+      const timers: ReturnType<typeof setTimeout>[] = [];
+      const updateSoon = () => {
+        update();
+        [100, 250, 500].forEach((delay) => timers.push(setTimeout(update, delay)));
+      };
+
+      update();
+      viewport.addEventListener('resize', update);
+      viewport.addEventListener('scroll', update);
+      window.addEventListener('resize', update);
+      document.addEventListener('focusin', updateSoon);
+      document.addEventListener('focusout', updateSoon);
+
+      return () => {
+        timers.forEach(clearTimeout);
+        viewport.removeEventListener('resize', update);
+        viewport.removeEventListener('scroll', update);
+        window.removeEventListener('resize', update);
+        document.removeEventListener('focusin', updateSoon);
+        document.removeEventListener('focusout', updateSoon);
+      };
+    }, []);
+    const inputCollapsed = inputAnim === 'out' || inputAnim === 'gone';
+
+    // Höhe des Eingabebereichs messen (wird für Animation und Platzfreigabe gebraucht)
+    useEffect(() => {
+      const element = inputInnerRef.current;
+
+      if (!element || typeof ResizeObserver === 'undefined') {
+        return undefined;
+      }
+
+      const update = () => {
+        const height = element.offsetHeight;
+
+        if (height > 0) {
+          setInputHeight(height);
+        }
+      };
+
+      update();
+
+      const observer = new ResizeObserver(update);
+      observer.observe(element);
+
+      return () => observer.disconnect();
+    }, []);
+
+    // Beim Wechsel zwischen Startseite und Chat immer sichtbar starten
+    useEffect(() => {
+      setInputAnim('idle');
+    }, [chatStarted]);
+
+    useEffect(() => {
+      // Auf der Startseite (noch kein Chat) bleibt der Eingabebereich immer sichtbar
+      if (!chatStarted) {
+        return undefined;
+      }
+
+      /*
+       * Nur ein einfacher Tipp (kaum Bewegung, kurze Dauer) blendet den Container
+       * ein oder aus. Wischen/Scrollen löst nie etwas aus.
+       */
+      const MAX_MOVE = 10; // Pixel
+      const MAX_TAP_DURATION = 500; // Millisekunden
+
+      let tracking = false;
+      let moved = false;
+      let startX = 0;
+      let startY = 0;
+      let startTime = 0;
+      let startedInsideInput = false;
+
+      const onTouchStart = (event: TouchEvent) => {
+        // Mehrfingergesten (Zoomen) ignorieren
+        if (event.touches.length !== 1) {
+          tracking = false;
+          return;
+        }
+
+        tracking = true;
+        moved = false;
+        startX = event.touches[0].clientX;
+        startY = event.touches[0].clientY;
+        startTime = Date.now();
+        startedInsideInput = !!inputContainerRef.current?.contains(event.target as Node);
+      };
+
+      const onTouchMove = (event: TouchEvent) => {
+        if (!tracking) {
+          return;
+        }
+
+        const touch = event.touches[0];
+
+        if (touch && (Math.abs(touch.clientX - startX) > MAX_MOVE || Math.abs(touch.clientY - startY) > MAX_MOVE)) {
+          moved = true;
+        }
+      };
+
+      const onTouchEnd = () => {
+        if (!tracking) {
+          return;
+        }
+
+        tracking = false;
+
+        // Scrollen/Wischen oder langes Drücken: nichts ein- oder ausblenden
+        if (moved || Date.now() - startTime > MAX_TAP_DURATION) {
+          return;
+        }
+
+        // Strecke bis zum unteren Bildschirmrand, damit der Container komplett herausgleitet
+        const rect = inputInnerRef.current?.getBoundingClientRect();
+
+        if (rect && rect.height > 0) {
+          setSlideDistance(Math.max(0, window.innerHeight - rect.top) + 16);
+        }
+
+        setInputAnim((state) => {
+          // ausgeblendet (oder gerade dabei): ein Tipp blendet wieder ein
+          if (state === 'out' || state === 'gone') {
+            return 'in';
+          }
+
+          // sichtbar: Tipp außerhalb des Containers blendet aus
+          if (!startedInsideInput) {
+            return 'out';
+          }
+
+          return state;
+        });
+      };
+
+      // Der Browser übernimmt die Geste (z.B. Scrollen): abbrechen
+      const onTouchCancel = () => {
+        tracking = false;
+      };
+
+      document.addEventListener('touchstart', onTouchStart, { passive: true });
+      document.addEventListener('touchmove', onTouchMove, { passive: true });
+      document.addEventListener('touchend', onTouchEnd, { passive: true });
+      document.addEventListener('touchcancel', onTouchCancel, { passive: true });
+
+      return () => {
+        document.removeEventListener('touchstart', onTouchStart);
+        document.removeEventListener('touchmove', onTouchMove);
+        document.removeEventListener('touchend', onTouchEnd);
+        document.removeEventListener('touchcancel', onTouchCancel);
+      };
+    }, [chatStarted]);
+
+    // gemeinsame Animation für Eingabecontainer und Buttons darunter
+    const slideAnimation =
+      inputAnim === 'out'
+        ? 'bolt-input-out 180ms ease-out forwards'
+        : inputAnim === 'in'
+          ? 'bolt-input-in 180ms ease-out'
+          : undefined;
     const [isListening, setIsListening] = useState(false);
     const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
     const [transcript, setTranscript] = useState('');
@@ -361,8 +556,8 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
               </div>
             )}
             <StickToBottom
-              className={classNames('pt-6 px-2 sm:px-6 relative', {
-                'h-full flex flex-col modern-scrollbar': chatStarted,
+              className={classNames('pt-6 px-2 sm:px-6 relative flex-1 min-h-0 flex flex-col', {
+                'modern-scrollbar': chatStarted,
               })}
               resize="smooth"
               initial="smooth"
@@ -372,7 +567,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   {() => {
                     return chatStarted ? (
                       <Messages
-                        className="flex flex-col w-full flex-1 max-w-chat pb-4 mx-auto z-1"
+                        className="flex flex-col w-full flex-1 max-w-chat pb-4 mx-auto z-1 text-[0.9rem] sm:text-base"
                         messages={messages}
                         isStreaming={isStreaming}
                         append={append}
@@ -387,11 +582,64 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                 </ClientOnly>
                 <ScrollToBottom />
               </StickToBottom.Content>
+              <style>{`
+                @keyframes bolt-input-out {
+                  from { transform: translateY(0); }
+                  to { transform: translateY(calc(var(--bolt-input-h) + 1rem)); }
+                }
+                @keyframes bolt-input-in {
+                  from { transform: translateY(calc(var(--bolt-input-h) + 1rem)); }
+                  to { transform: translateY(0); }
+                }
+              `}</style>
               <div
-                className={classNames('my-auto flex flex-col gap-2 w-full max-w-chat mx-auto z-prompt mb-6', {
-                  'sticky bottom-2': chatStarted,
+                ref={inputContainerRef}
+                className={classNames('mt-auto w-full max-w-chat mx-auto z-prompt', {
+                  'sticky bottom-0': chatStarted,
                 })}
+                style={{
+                  ...(chatStarted && inputHeight > 0 ? { height: inputCollapsed ? 0 : inputHeight } : {}),
+                  transform: keyboardOffset > 0 ? `translateY(-${keyboardOffset}px)` : undefined,
+                  transition: [
+                    chatStarted && inputHeight > 0 && inputAnim !== 'idle' ? 'height 180ms ease-out' : '',
+                    'transform 120ms ease-out',
+                  ]
+                    .filter(Boolean)
+                    .join(', '),
+                }}
               >
+                <div
+                  ref={inputInnerRef}
+                  className="flex flex-col gap-2 pb-0"
+                  style={
+                    {
+                      '--bolt-input-h': `${slideDistance}px`,
+                      animation: slideAnimation,
+                      display: inputAnim === 'gone' && chatStarted ? 'none' : undefined,
+                      visibility: inputAnim === 'gone' && !chatStarted ? 'hidden' : undefined,
+                    } as React.CSSProperties
+                  }
+                  onAnimationEnd={(event) => {
+                    if (event.animationName === 'bolt-input-out') {
+                      setInputAnim('gone');
+                    } else if (event.animationName === 'bolt-input-in') {
+                      setInputAnim('idle');
+                    }
+                  }}
+                >
+                {!chatStarted && (
+                  <div className="bolt-examples-first">
+                    <style>{`.bolt-examples-first button:not(:first-of-type) { display: none; }`}</style>
+                    {ExamplePrompts((event, messageInput) => {
+                      if (isStreaming) {
+                        handleStop?.();
+                        return;
+                      }
+
+                      handleSendMessage?.(event, messageInput);
+                    })}
+                  </div>
+                )}
                 <div className="flex flex-col gap-2">
                   {deployAlert && (
                     <DeployChatAlert
@@ -469,28 +717,9 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   setSelectedElement={setSelectedElement}
                   onWebSearchResult={onWebSearchResult}
                 />
+                </div>
               </div>
             </StickToBottom>
-            <div className="flex flex-col justify-center">
-              {!chatStarted && (
-                <div className="flex justify-center gap-2">
-                  {ImportButtons(importChat)}
-                  <GitCloneButton importChat={importChat} />
-                </div>
-              )}
-              <div className="flex flex-col gap-5">
-                {!chatStarted &&
-                  ExamplePrompts((event, messageInput) => {
-                    if (isStreaming) {
-                      handleStop?.();
-                      return;
-                    }
-
-                    handleSendMessage?.(event, messageInput);
-                  })}
-                {!chatStarted && <StarterTemplates />}
-              </div>
-            </div>
           </div>
           <ClientOnly>
             {() => (

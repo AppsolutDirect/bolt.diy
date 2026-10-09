@@ -175,16 +175,16 @@ ${escapeBoltTags(file.content)}
           'text-bolt-elements-textPrimary',
           'hover:bg-bolt-elements-background-depth-2',
           'border border-bolt-elements-borderColor',
-          'h-10 px-4 py-2 min-w-[120px] justify-center',
+          'h-9 sm:h-10 px-2 sm:px-4 py-1 sm:py-2 flex-1 min-w-0 whitespace-nowrap overflow-hidden text-xs sm:text-sm justify-center',
           'transition-all duration-200 ease-in-out',
           className,
         )}
         disabled={!ready || loading}
       >
         Clone a repo
-        <div className="flex items-center gap-1 ml-2">
-          <GitBranch className="w-4 h-4" />
-          <GitBranch className="w-4 h-4" />
+        <div className="flex items-center gap-1 ml-1 sm:ml-2">
+          <GitBranch className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <GitBranch className="hidden sm:block w-4 h-4" />
         </div>
       </Button>
 

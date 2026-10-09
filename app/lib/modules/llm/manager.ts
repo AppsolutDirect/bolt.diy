@@ -13,6 +13,9 @@ const logger = createScopedLogger('LLMManager');
  */
 const ENABLED_PROVIDERS = new Set(['OpenRouter', 'Anthropic', 'OpenAI', 'Google']);
 
+// Reihenfolge in der Anbieter-Auswahl: Google zuerst
+const PROVIDER_ORDER = ['Google', 'OpenRouter', 'Anthropic', 'OpenAI'];
+
 export class LLMManager {
   private static _instance: LLMManager;
   private _providers: Map<string, BaseProvider> = new Map();
@@ -84,7 +87,14 @@ export class LLMManager {
   }
 
   getAllProviders(): BaseProvider[] {
-    return Array.from(this._providers.values());
+    const rank = (name: string) => {
+      const index = PROVIDER_ORDER.indexOf(name);
+
+      return index === -1 ? PROVIDER_ORDER.length : index;
+    };
+
+    // Array.sort ist stabil: unbekannte Anbieter behalten ihre Reihenfolge und stehen am Ende
+    return Array.from(this._providers.values()).sort((a, b) => rank(a.name) - rank(b.name));
   }
 
   getModelList(): ModelInfo[] {
@@ -218,14 +228,13 @@ export class LLMManager {
 
   getDefaultProvider(): BaseProvider {
     /*
-     * Prefer OpenRouter explicitly. Registration order follows the export
-     * order of ./registry, which would otherwise make the default depend on
-     * which provider happens to be listed first.
+     * Prefer Google explicitly, so the default does not depend on the
+     * order in which providers happen to be registered.
      */
-    const openRouter = this._providers.get('OpenRouter');
+    const google = this._providers.get('Google');
 
-    if (openRouter) {
-      return openRouter;
+    if (google) {
+      return google;
     }
 
     const firstProvider = this._providers.values().next().value;
