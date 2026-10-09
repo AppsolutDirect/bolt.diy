@@ -174,13 +174,27 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
         setKeyboardOffset(offset > 80 ? offset : 0);
       };
 
+      // Manche Android-Tastaturen melden ihre Größe verspätet: mehrfach nachmessen
+      const timers: ReturnType<typeof setTimeout>[] = [];
+      const updateSoon = () => {
+        update();
+        [100, 250, 500].forEach((delay) => timers.push(setTimeout(update, delay)));
+      };
+
       update();
       viewport.addEventListener('resize', update);
       viewport.addEventListener('scroll', update);
+      window.addEventListener('resize', update);
+      document.addEventListener('focusin', updateSoon);
+      document.addEventListener('focusout', updateSoon);
 
       return () => {
+        timers.forEach(clearTimeout);
         viewport.removeEventListener('resize', update);
         viewport.removeEventListener('scroll', update);
+        window.removeEventListener('resize', update);
+        document.removeEventListener('focusin', updateSoon);
+        document.removeEventListener('focusout', updateSoon);
       };
     }, []);
     const inputCollapsed = inputAnim === 'out' || inputAnim === 'gone';
@@ -220,8 +234,58 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
         return undefined;
       }
 
+      /*
+       * Nur ein einfacher Tipp (kaum Bewegung, kurze Dauer) blendet den Container
+       * ein oder aus. Wischen/Scrollen löst nie etwas aus.
+       */
+      const MAX_MOVE = 10; // Pixel
+      const MAX_TAP_DURATION = 500; // Millisekunden
+
+      let tracking = false;
+      let moved = false;
+      let startX = 0;
+      let startY = 0;
+      let startTime = 0;
+      let startedInsideInput = false;
+
       const onTouchStart = (event: TouchEvent) => {
-        const touchedInsideInput = !!inputContainerRef.current?.contains(event.target as Node);
+        // Mehrfingergesten (Zoomen) ignorieren
+        if (event.touches.length !== 1) {
+          tracking = false;
+          return;
+        }
+
+        tracking = true;
+        moved = false;
+        startX = event.touches[0].clientX;
+        startY = event.touches[0].clientY;
+        startTime = Date.now();
+        startedInsideInput = !!inputContainerRef.current?.contains(event.target as Node);
+      };
+
+      const onTouchMove = (event: TouchEvent) => {
+        if (!tracking) {
+          return;
+        }
+
+        const touch = event.touches[0];
+
+        if (touch && (Math.abs(touch.clientX - startX) > MAX_MOVE || Math.abs(touch.clientY - startY) > MAX_MOVE)) {
+          moved = true;
+        }
+      };
+
+      const onTouchEnd = () => {
+        if (!tracking) {
+          return;
+        }
+
+        tracking = false;
+
+        // Scrollen/Wischen oder langes Drücken: nichts ein- oder ausblenden
+        if (moved || Date.now() - startTime > MAX_TAP_DURATION) {
+          return;
+        }
 
         // Strecke bis zum unteren Bildschirmrand, damit der Container komplett herausgleitet
         const rect = inputInnerRef.current?.getBoundingClientRect();
@@ -231,13 +295,13 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
         }
 
         setInputAnim((state) => {
-          // ausgeblendet (oder gerade dabei): jedes Tippen blendet wieder ein
+          // ausgeblendet (oder gerade dabei): ein Tipp blendet wieder ein
           if (state === 'out' || state === 'gone') {
             return 'in';
           }
 
-          // sichtbar: Tippen außerhalb des Containers blendet aus
-          if (!touchedInsideInput) {
+          // sichtbar: Tipp außerhalb des Containers blendet aus
+          if (!startedInsideInput) {
             return 'out';
           }
 
@@ -245,9 +309,22 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
         });
       };
 
-      document.addEventListener('touchstart', onTouchStart, { passive: true });
+      // Der Browser übernimmt die Geste (z.B. Scrollen): abbrechen
+      const onTouchCancel = () => {
+        tracking = false;
+      };
 
-      return () => document.removeEventListener('touchstart', onTouchStart);
+      document.addEventListener('touchstart', onTouchStart, { passive: true });
+      document.addEventListener('touchmove', onTouchMove, { passive: true });
+      document.addEventListener('touchend', onTouchEnd, { passive: true });
+      document.addEventListener('touchcancel', onTouchCancel, { passive: true });
+
+      return () => {
+        document.removeEventListener('touchstart', onTouchStart);
+        document.removeEventListener('touchmove', onTouchMove);
+        document.removeEventListener('touchend', onTouchEnd);
+        document.removeEventListener('touchcancel', onTouchCancel);
+      };
     }, [chatStarted]);
 
     // gemeinsame Animation für Eingabecontainer und Buttons darunter
