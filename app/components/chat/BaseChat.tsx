@@ -12,14 +12,11 @@ import { getApiKeysFromCookies } from './APIKeyManager';
 import styles from './BaseChat.module.scss';
 import ChatAlert from './ChatAlert';
 import { ChatBox } from './ChatBox';
-import GitCloneButton from './GitCloneButton';
 import LlmErrorAlert from './LLMApiAlert';
 import { Messages } from './Messages.client';
 import ProgressCompilation from './ProgressCompilation';
-import StarterTemplates from './StarterTemplates';
 import { ExamplePrompts } from '~/components/chat/ExamplePrompts';
 import { SupabaseChatAlert } from '~/components/chat/SupabaseAlert';
-import { ImportButtons } from '~/components/chat/chatExportAndImport/ImportButtons';
 import DeployChatAlert from '~/components/deploy/DeployAlert';
 import { Menu } from '~/components/sidebar/Menu.client';
 import type { ElementInfo } from '~/components/workbench/Inspector';
@@ -187,6 +184,11 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     }, [chatStarted]);
 
     useEffect(() => {
+      // Auf der Startseite (noch kein Chat) bleibt der Eingabebereich immer sichtbar
+      if (!chatStarted) {
+        return undefined;
+      }
+
       const onTouchStart = (event: TouchEvent) => {
         const touchedInsideInput = !!inputContainerRef.current?.contains(event.target as Node);
 
@@ -215,7 +217,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       document.addEventListener('touchstart', onTouchStart, { passive: true });
 
       return () => document.removeEventListener('touchstart', onTouchStart);
-    }, []);
+    }, [chatStarted]);
 
     // gemeinsame Animation für Eingabecontainer und Buttons darunter
     const slideAnimation =
@@ -446,8 +448,8 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
               </div>
             )}
             <StickToBottom
-              className={classNames('pt-6 px-2 sm:px-6 relative', {
-                'h-full flex flex-col modern-scrollbar': chatStarted,
+              className={classNames('pt-6 px-2 sm:px-6 relative flex-1 min-h-0 flex flex-col', {
+                'modern-scrollbar': chatStarted,
               })}
               resize="smooth"
               initial="smooth"
@@ -484,7 +486,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
               `}</style>
               <div
                 ref={inputContainerRef}
-                className={classNames('my-auto w-full max-w-chat mx-auto z-prompt', {
+                className={classNames('mt-auto w-full max-w-chat mx-auto z-prompt', {
                   'sticky bottom-0': chatStarted,
                 })}
                 style={
@@ -498,7 +500,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
               >
                 <div
                   ref={inputInnerRef}
-                  className={classNames('flex flex-col gap-2', chatStarted ? 'pb-0' : 'pb-2')}
+                  className="flex flex-col gap-2 pb-0"
                   style={
                     {
                       '--bolt-input-h': `${slideDistance}px`,
@@ -515,6 +517,19 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                     }
                   }}
                 >
+                {!chatStarted && (
+                  <div className="bolt-examples-first">
+                    <style>{`.bolt-examples-first button:not(:first-of-type) { display: none; }`}</style>
+                    {ExamplePrompts((event, messageInput) => {
+                      if (isStreaming) {
+                        handleStop?.();
+                        return;
+                      }
+
+                      handleSendMessage?.(event, messageInput);
+                    })}
+                  </div>
+                )}
                 <div className="flex flex-col gap-2">
                   {deployAlert && (
                     <DeployChatAlert
@@ -595,37 +610,6 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                 </div>
               </div>
             </StickToBottom>
-            <div className="flex flex-col justify-center">
-              {!chatStarted && (
-                <div
-                  className="px-2 sm:px-6"
-                  style={
-                    {
-                      '--bolt-input-h': `${slideDistance}px`,
-                      animation: slideAnimation,
-                      visibility: inputAnim === 'gone' ? 'hidden' : undefined,
-                    } as React.CSSProperties
-                  }
-                >
-                  <div className="flex w-full max-w-chat mx-auto gap-1.5">
-                    {ImportButtons(importChat)}
-                    <GitCloneButton importChat={importChat} />
-                  </div>
-                </div>
-              )}
-              <div className="flex flex-col gap-5">
-                {!chatStarted &&
-                  ExamplePrompts((event, messageInput) => {
-                    if (isStreaming) {
-                      handleStop?.();
-                      return;
-                    }
-
-                    handleSendMessage?.(event, messageInput);
-                  })}
-                {!chatStarted && <StarterTemplates />}
-              </div>
-            </div>
           </div>
           <ClientOnly>
             {() => (
