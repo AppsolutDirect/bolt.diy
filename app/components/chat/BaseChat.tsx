@@ -141,18 +141,20 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     const [isModelSettingsCollapsed, setIsModelSettingsCollapsed] = useState(true);
 
     /*
-     * Eingabebereich beim Wischen/Scrollen nach unten aus dem Bild schieben und
-     * nach dem Loslassen (mit kurzer Verzögerung) wieder hereinschieben.
+     * Eingabebereich (samt Buttons) bei einem Tippen AUSSERHALB des Containers
+     * nach unten aus dem Bild schieben und bei dem nächsten Tippen irgendwo
+     * wieder hereinschieben.
      *
      * 'idle'  = sichtbar
      * 'out'   = gleitet gerade nach unten weg
-     * 'gone'  = komplett weg (aus dem Layout entfernt, Text nutzt die volle Höhe)
+     * 'gone'  = komplett weg
      * 'in'    = gleitet gerade wieder herein
      */
     const inputContainerRef = React.useRef<HTMLDivElement>(null);
     const inputInnerRef = React.useRef<HTMLDivElement>(null);
     const [inputAnim, setInputAnim] = useState<'idle' | 'out' | 'gone' | 'in'>('idle');
     const [inputHeight, setInputHeight] = useState(0);
+    const [slideDistance, setSlideDistance] = useState(0);
     const inputCollapsed = inputAnim === 'out' || inputAnim === 'gone';
 
     // Höhe des Eingabebereichs messen (wird für Animation und Platzfreigabe gebraucht)
@@ -179,57 +181,49 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       return () => observer.disconnect();
     }, []);
 
+    // Beim Wechsel zwischen Startseite und Chat immer sichtbar starten
     useEffect(() => {
-      if (!chatStarted) {
-        return undefined;
-      }
+      setInputAnim('idle');
+    }, [chatStarted]);
 
-      let startY = 0;
-      let startedInsideInput = false;
-      let showTimer: ReturnType<typeof setTimeout> | undefined;
-
+    useEffect(() => {
       const onTouchStart = (event: TouchEvent) => {
-        clearTimeout(showTimer);
-        startY = event.touches[0]?.clientY ?? 0;
-        startedInsideInput = !!inputContainerRef.current?.contains(event.target as Node);
-      };
+        const touchedInsideInput = !!inputContainerRef.current?.contains(event.target as Node);
 
-      const onTouchMove = (event: TouchEvent) => {
-        // Wischen im Eingabebereich selbst (z.B. beim Tippen) blendet nichts aus
-        if (startedInsideInput) {
-          return;
+        // Strecke bis zum unteren Bildschirmrand, damit der Container komplett herausgleitet
+        const rect = inputInnerRef.current?.getBoundingClientRect();
+
+        if (rect && rect.height > 0) {
+          setSlideDistance(Math.max(0, window.innerHeight - rect.top) + 16);
         }
 
-        const currentY = event.touches[0]?.clientY ?? 0;
+        setInputAnim((state) => {
+          // ausgeblendet (oder gerade dabei): jedes Tippen blendet wieder ein
+          if (state === 'out' || state === 'gone') {
+            return 'in';
+          }
 
-        if (Math.abs(currentY - startY) > 8) {
-          clearTimeout(showTimer);
-          setInputAnim((state) => (state === 'idle' || state === 'in' ? 'out' : state));
-        }
-      };
+          // sichtbar: Tippen außerhalb des Containers blendet aus
+          if (!touchedInsideInput) {
+            return 'out';
+          }
 
-      const onTouchEnd = () => {
-        clearTimeout(showTimer);
-
-        // kurze Verzögerung, dann wieder einblenden
-        showTimer = setTimeout(() => {
-          setInputAnim((state) => (state === 'out' || state === 'gone' ? 'in' : state));
-        }, 250);
+          return state;
+        });
       };
 
       document.addEventListener('touchstart', onTouchStart, { passive: true });
-      document.addEventListener('touchmove', onTouchMove, { passive: true });
-      document.addEventListener('touchend', onTouchEnd, { passive: true });
-      document.addEventListener('touchcancel', onTouchEnd, { passive: true });
 
-      return () => {
-        clearTimeout(showTimer);
-        document.removeEventListener('touchstart', onTouchStart);
-        document.removeEventListener('touchmove', onTouchMove);
-        document.removeEventListener('touchend', onTouchEnd);
-        document.removeEventListener('touchcancel', onTouchEnd);
-      };
-    }, [chatStarted]);
+      return () => document.removeEventListener('touchstart', onTouchStart);
+    }, []);
+
+    // gemeinsame Animation für Eingabecontainer und Buttons darunter
+    const slideAnimation =
+      inputAnim === 'out'
+        ? 'bolt-input-out 180ms ease-out forwards'
+        : inputAnim === 'in'
+          ? 'bolt-input-in 180ms ease-out'
+          : undefined;
     const [isListening, setIsListening] = useState(false);
     const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
     const [transcript, setTranscript] = useState('');
@@ -491,7 +485,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
               <div
                 ref={inputContainerRef}
                 className={classNames('my-auto w-full max-w-chat mx-auto z-prompt', {
-                  'sticky bottom-2': chatStarted,
+                  'sticky bottom-0': chatStarted,
                 })}
                 style={
                   chatStarted && inputHeight > 0
@@ -504,17 +498,13 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
               >
                 <div
                   ref={inputInnerRef}
-                  className="flex flex-col gap-2 pb-6"
+                  className={classNames('flex flex-col gap-2', chatStarted ? 'pb-0' : 'pb-2')}
                   style={
                     {
-                      '--bolt-input-h': `${inputHeight}px`,
-                      animation:
-                        inputAnim === 'out'
-                          ? 'bolt-input-out 180ms ease-out forwards'
-                          : inputAnim === 'in'
-                            ? 'bolt-input-in 180ms ease-out'
-                            : undefined,
-                      display: inputAnim === 'gone' ? 'none' : undefined,
+                      '--bolt-input-h': `${slideDistance}px`,
+                      animation: slideAnimation,
+                      display: inputAnim === 'gone' && chatStarted ? 'none' : undefined,
+                      visibility: inputAnim === 'gone' && !chatStarted ? 'hidden' : undefined,
                     } as React.CSSProperties
                   }
                   onAnimationEnd={(event) => {
@@ -607,9 +597,20 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
             </StickToBottom>
             <div className="flex flex-col justify-center">
               {!chatStarted && (
-                <div className="flex justify-center gap-2">
-                  {ImportButtons(importChat)}
-                  <GitCloneButton importChat={importChat} />
+                <div
+                  className="px-2 sm:px-6"
+                  style={
+                    {
+                      '--bolt-input-h': `${slideDistance}px`,
+                      animation: slideAnimation,
+                      visibility: inputAnim === 'gone' ? 'hidden' : undefined,
+                    } as React.CSSProperties
+                  }
+                >
+                  <div className="flex w-full max-w-chat mx-auto gap-1.5">
+                    {ImportButtons(importChat)}
+                    <GitCloneButton importChat={importChat} />
+                  </div>
                 </div>
               )}
               <div className="flex flex-col gap-5">
