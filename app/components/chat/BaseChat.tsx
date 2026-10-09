@@ -12,9 +12,11 @@ import { getApiKeysFromCookies } from './APIKeyManager';
 import styles from './BaseChat.module.scss';
 import ChatAlert from './ChatAlert';
 import { ChatBox } from './ChatBox';
+import GitCloneButton from './GitCloneButton';
 import LlmErrorAlert from './LLMApiAlert';
 import { Messages } from './Messages.client';
 import ProgressCompilation from './ProgressCompilation';
+import { ImportButtons } from '~/components/chat/chatExportAndImport/ImportButtons';
 import { ExamplePrompts } from '~/components/chat/ExamplePrompts';
 import { SupabaseChatAlert } from '~/components/chat/SupabaseAlert';
 import DeployChatAlert from '~/components/deploy/DeployAlert';
@@ -154,47 +156,65 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     const [slideDistance, setSlideDistance] = useState(0);
 
     /*
-     * Sicherheitsnetz für die Android-Bildschirmtastatur: Überdeckt die Tastatur den
-     * Eingabebereich (Browser ohne "interactive-widget=resizes-content"), wird er genau
-     * um die Tastaturhöhe nach oben verschoben und fährt beim Schließen wieder nach unten.
+     * Android-Bildschirmtastatur: Der Eingabebereich wird um genau die Tastaturhöhe nach oben
+     * geschoben und fährt beim Schließen wieder ganz nach unten.
+     *
+     * Schnellster Weg (Chrome/Android): VirtualKeyboard-API. Der Browser liefert die Tastaturhöhe
+     * direkt als CSS-Wert (env(keyboard-inset-height)), ohne JavaScript und ohne Neuberechnung
+     * der Seite. Fallback für andere Browser: sichtbare Fläche messen und die Verschiebung
+     * direkt am Element setzen (ohne React-Rendering, ohne Übergangsanimation).
      */
-    const [keyboardOffset, setKeyboardOffset] = useState(0);
+    const [hasVirtualKeyboard, setHasVirtualKeyboard] = useState(false);
 
     useEffect(() => {
+      const nav = navigator as Navigator & { virtualKeyboard?: { overlaysContent: boolean } };
+
+      if (nav.virtualKeyboard) {
+        nav.virtualKeyboard.overlaysContent = true;
+        setHasVirtualKeyboard(true);
+
+        return () => {
+          if (nav.virtualKeyboard) {
+            nav.virtualKeyboard.overlaysContent = false;
+          }
+        };
+      }
+
       const viewport = window.visualViewport;
 
       if (!viewport) {
         return undefined;
       }
 
-      const update = () => {
+      const apply = () => {
         const offset = Math.round(window.innerHeight - viewport.height - viewport.offsetTop);
+        const element = inputContainerRef.current;
 
-        // kleine Abweichungen (Adressleiste etc.) ignorieren
-        setKeyboardOffset(offset > 80 ? offset : 0);
+        if (element) {
+          // kleine Abweichungen (Adressleiste etc.) ignorieren
+          element.style.transform = offset > 80 ? `translateY(-${offset}px)` : '';
+        }
       };
 
-      // Manche Android-Tastaturen melden ihre Größe verspätet: mehrfach nachmessen
+      // Manche Android-Tastaturen melden ihre Größe verspätet: kurz nachmessen
       const timers: ReturnType<typeof setTimeout>[] = [];
-      const updateSoon = () => {
-        update();
-        [100, 250, 500].forEach((delay) => timers.push(setTimeout(update, delay)));
+      const applySoon = () => {
+        apply();
+        [100, 250].forEach((delay) => timers.push(setTimeout(apply, delay)));
       };
 
-      update();
-      viewport.addEventListener('resize', update);
-      viewport.addEventListener('scroll', update);
-      window.addEventListener('resize', update);
-      document.addEventListener('focusin', updateSoon);
-      document.addEventListener('focusout', updateSoon);
+      apply();
+      viewport.addEventListener('resize', apply);
+      viewport.addEventListener('scroll', apply);
+      document.addEventListener('focusin', applySoon);
+      document.addEventListener('focusout', applySoon);
 
       return () => {
         timers.forEach(clearTimeout);
-        viewport.removeEventListener('resize', update);
-        viewport.removeEventListener('scroll', update);
-        window.removeEventListener('resize', update);
-        document.removeEventListener('focusin', updateSoon);
-        document.removeEventListener('focusout', updateSoon);
+        viewport.removeEventListener('resize', apply);
+        viewport.removeEventListener('scroll', apply);
+        document.removeEventListener('focusin', applySoon);
+        document.removeEventListener('focusout', applySoon);
       };
     }, []);
     const inputCollapsed = inputAnim === 'out' || inputAnim === 'gone';
@@ -599,18 +619,14 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                 })}
                 style={{
                   ...(chatStarted && inputHeight > 0 ? { height: inputCollapsed ? 0 : inputHeight } : {}),
-                  transform: keyboardOffset > 0 ? `translateY(-${keyboardOffset}px)` : undefined,
-                  transition: [
-                    chatStarted && inputHeight > 0 && inputAnim !== 'idle' ? 'height 180ms ease-out' : '',
-                    'transform 120ms ease-out',
-                  ]
-                    .filter(Boolean)
-                    .join(', '),
+                  ...(hasVirtualKeyboard ? { transform: 'translateY(calc(-1 * env(keyboard-inset-height, 0px)))' } : {}),
+                  transition:
+                    chatStarted && inputHeight > 0 && inputAnim !== 'idle' ? 'height 180ms ease-out' : undefined,
                 }}
               >
                 <div
                   ref={inputInnerRef}
-                  className="flex flex-col gap-2 pb-0"
+                  className="flex flex-col gap-1 pb-0"
                   style={
                     {
                       '--bolt-input-h': `${slideDistance}px`,
@@ -628,19 +644,25 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   }}
                 >
                 {!chatStarted && (
-                  <div className="bolt-examples-first">
-                    <style>{`.bolt-examples-first button:not(:first-of-type) { display: none; }`}</style>
-                    {ExamplePrompts((event, messageInput) => {
-                      if (isStreaming) {
-                        handleStop?.();
-                        return;
-                      }
+                  <div className="flex flex-col gap-2 pb-1">
+                    <div className="bolt-examples-first">
+                      <style>{`.bolt-examples-first button:not(:first-of-type) { display: none; }`}</style>
+                      {ExamplePrompts((event, messageInput) => {
+                        if (isStreaming) {
+                          handleStop?.();
+                          return;
+                        }
 
-                      handleSendMessage?.(event, messageInput);
-                    })}
+                        handleSendMessage?.(event, messageInput);
+                      })}
+                    </div>
+                    <div className="flex w-full gap-1.5">
+                      {ImportButtons(importChat)}
+                      <GitCloneButton importChat={importChat} />
+                    </div>
                   </div>
                 )}
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 empty:hidden">
                   {deployAlert && (
                     <DeployChatAlert
                       alert={deployAlert}
