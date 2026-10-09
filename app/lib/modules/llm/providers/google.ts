@@ -1,5 +1,5 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import type { LanguageModelV1 } from 'ai';
+import { wrapLanguageModel, type LanguageModelV1 } from 'ai';
 import { BaseProvider } from '~/lib/modules/llm/base-provider';
 import type { ModelInfo } from '~/lib/modules/llm/types';
 import type { IProviderSetting } from '~/types/model';
@@ -13,6 +13,15 @@ export default class GoogleProvider extends BaseProvider {
   };
 
   staticModels: ModelInfo[] = [
+    // Gemma 3 4B: 32K Kontext, 8K Ausgabe (Standardmodell dieser App)
+    {
+      name: 'gemma-3-4b-it',
+      label: 'Gemma 3 4B',
+      provider: 'Google',
+      maxTokenAllowed: 32768,
+      maxCompletionTokens: 8192,
+    },
+
     /*
      * Essential fallback models - only the most reliable/stable ones
      * Gemini 1.5 Pro: 2M context, 8K output limit (verified from API docs)
@@ -142,6 +151,48 @@ export default class GoogleProvider extends BaseProvider {
       apiKey,
     });
 
-    return google(model);
+    const instance = google(model);
+
+    // Alle Modelle außer Gemma: unverändert verwenden
+    if (!model.startsWith('gemma')) {
+      return instance;
+    }
+
+    /*
+     * Gemma 3 unterstützt keine System-Anweisung (die API lehnt sie ab).
+     * Workaround: Den System-Prompt als Text an den Anfang der ersten
+     * Nutzer-Nachricht stellen.
+     */
+    return wrapLanguageModel({
+      model: instance,
+      middleware: {
+        transformParams: async ({ params }) => {
+          const prompt = params.prompt as any[];
+          const systemText = prompt
+            .filter((message) => message.role === 'system')
+            .map((message) => message.content)
+            .join('\n\n');
+
+          if (!systemText) {
+            return params;
+          }
+
+          const rest = prompt.filter((message) => message.role !== 'system');
+          const firstUserIndex = rest.findIndex((message) => message.role === 'user');
+
+          if (firstUserIndex === -1) {
+            return { ...params, prompt: [{ role: 'user', content: [{ type: 'text', text: systemText }] }, ...rest] as any };
+          }
+
+          const firstUser = rest[firstUserIndex];
+          rest[firstUserIndex] = {
+            ...firstUser,
+            content: [{ type: 'text', text: `${systemText}\n\n` }, ...firstUser.content],
+          };
+
+          return { ...params, prompt: rest as any };
+        },
+      },
+    });
   }
 }
