@@ -1,0 +1,24 @@
+/*
+ * Leistungs-Optimierungen für Smartphones und Tablets (Bildschirmbreite unter 1024 px).
+ * Auf dem PC bleibt alles unverändert.
+ */
+@media (max-width: 1023px) {
+  /* Unschärfe hinter Flächen ist auf Handys sehr GPU-intensiv und lässt Scrollen ruckeln */
+  *,
+  *::before,
+  *::after {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Dekorative Hintergrund-Animationen (Strahlen, leuchtender Rahmen) ausschalten */
+  [class*='BackgroundRays'],
+  [class*='PromptEffectContainer'] {
+    display: none !important;
+  }
+
+  /* Kein graues Aufblitzen beim Tippen */
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+}

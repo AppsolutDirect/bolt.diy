@@ -73,6 +73,7 @@ export function HistoryItem({
         { 'cursor-pointer': selectionMode },
       )}
       onClick={selectionMode ? handleItemClick : undefined}
+      style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 40px' } as React.CSSProperties}
     >
       {selectionMode && (
         <div className="flex items-center mr-2" onClick={(e) => e.stopPropagation()}>

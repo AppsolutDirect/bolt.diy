@@ -30,6 +30,7 @@ export const links: LinksFunction = () => [
   { rel: 'stylesheet', href: reactToastifyStyles },
   { rel: 'stylesheet', href: tailwindReset },
   { rel: 'stylesheet', href: globalStyles },
+  { rel: 'stylesheet', href: mobilePerformanceStyles },
   { rel: 'stylesheet', href: xtermStyles },
   {
     rel: 'preconnect',
@@ -139,6 +140,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 import { logStore } from './lib/stores/logs';
 import { themeStore } from './lib/stores/theme';
 import globalStyles from './styles/index.scss?url';
+import mobilePerformanceStyles from './styles/mobile-performance.css?url';
 import { stripIndents } from './utils/stripIndent';
 
 export default function App() {
