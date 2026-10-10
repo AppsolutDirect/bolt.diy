@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ordnerzugriff-Test</title>
+    <style>
+      body { margin: 0; padding: 1rem; font-family: system-ui, sans-serif; background: #1e2327; color: #e6edf3; line-height: 1.4; }
+      h1 { font-size: 1.2rem; margin: 0 0 0.5rem; }
+      h2 { font-size: 1rem; margin: 1.2rem 0 0.4rem; }
+      button, label.btn { display: block; width: 100%; box-sizing: border-box; padding: 0.8rem; margin: 0.4rem 0; border: 0; border-radius: 0.6rem;
+        background: #78beff; color: #101418; font-size: 1rem; text-align: center; }
+      pre { white-space: pre-wrap; word-break: break-word; background: #11161a; padding: 0.7rem; border-radius: 0.5rem; font-size: 0.85rem; min-height: 2.5rem; }
+      input[type="file"] { display: none; }
+      .ok { color: #7ee787; } .bad { color: #ff7b72; }
+    </style>
+  </head>
+  <body>
+    <h1>Ordnerzugriff-Test</h1>
+    <p>Dieser Test zeigt, was dein Browser auf diesem Handy kann. Mach bitte einen Screenshot vom Ergebnis.</p>
+
+    <h2>1. Verfügbare Funktionen</h2>
+    <pre id="features"></pre>
+
+    <h2>2. Ordner wählen mit Schreibzugriff</h2>
+    <button id="pick">Ordner wählen (showDirectoryPicker)</button>
+    <pre id="pickResult">noch nicht getestet</pre>
+
+    <h2>3. Ordner hochladen (Import Folder)</h2>
+    <label class="btn" for="dirInput">Ordner wählen (webkitdirectory)</label>
+    <input id="dirInput" type="file" webkitdirectory multiple />
+    <pre id="dirResult">noch nicht getestet</pre>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const mark = (ok) => (ok ? '<span class="ok">JA</span>' : '<span class="bad">NEIN</span>');
+
+      $('features').innerHTML = [
+        'showDirectoryPicker (Ordner wählen + schreiben): ' + mark('showDirectoryPicker' in window),
+        'showOpenFilePicker (Dateien wählen): ' + mark('showOpenFilePicker' in window),
+        'showSaveFilePicker (Datei speichern): ' + mark('showSaveFilePicker' in window),
+        'Interner App-Speicher (OPFS): ' + mark(!!(navigator.storage && navigator.storage.getDirectory)),
+        'Installierte App (standalone): ' + mark(window.matchMedia('(display-mode: standalone)').matches),
+        'Browser: ' + navigator.userAgent,
+      ].join('\n');
+
+      $('pick').addEventListener('click', async () => {
+        const out = $('pickResult');
+        if (!('showDirectoryPicker' in window)) {
+          out.innerHTML = '<span class="bad">showDirectoryPicker gibt es in diesem Browser nicht.</span>';
+          return;
+        }
+        try {
+          const dir = await window.showDirectoryPicker({ mode: 'readwrite' });
+          const names = [];
+          for await (const [name, handle] of dir.entries()) {
+            names.push((handle.kind === 'directory' ? '[Ordner] ' : '') + name);
+            if (names.length >= 20) break;
+          }
+          let writeInfo = '';
+          try {
+            const file = await dir.getFileHandle('bolt-schreibtest.txt', { create: true });
+            const w = await file.createWritable();
+            await w.write('Schreibtest ' + new Date().toISOString());
+            await w.close();
+            writeInfo = '\n<span class="ok">Schreiben funktioniert</span> (Datei bolt-schreibtest.txt angelegt)';
+          } catch (e) {
+            writeInfo = '\n<span class="bad">Schreiben fehlgeschlagen: ' + e.name + ' – ' + e.message + '</span>';
+          }
+          out.innerHTML = 'Ordner: ' + dir.name + '\nInhalt (max. 20):\n' + (names.join('\n') || '(leer)') + writeInfo;
+        } catch (e) {
+          out.innerHTML = '<span class="bad">Fehler: ' + e.name + ' – ' + e.message + '</span>';
+        }
+      });
+
+      $('dirInput').addEventListener('change', (event) => {
+        const files = Array.from(event.target.files || []);
+        const paths = files.slice(0, 15).map((f) => f.webkitRelativePath || f.name);
+        const hasFolders = files.some((f) => (f.webkitRelativePath || '').includes('/'));
+        $('dirResult').innerHTML =
+          'Dateien erhalten: ' + files.length + '\nOrdnerstruktur erkannt: ' + mark(hasFolders) + '\n' + paths.join('\n');
+      });
+    </script>
+  </body>
+</html>
