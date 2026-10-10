@@ -362,7 +362,12 @@ export const Workbench = memo(
       setIsSyncing(true);
 
       try {
-        const directoryHandle = await window.showDirectoryPicker();
+        // Ordner mit Lese- UND Schreibzugriff anfordern (auf Android sofort beschreibbar)
+        const directoryHandle = await (
+          window as unknown as {
+            showDirectoryPicker: (options?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>;
+          }
+        ).showDirectoryPicker({ mode: 'readwrite' });
         await workbenchStore.syncFiles(directoryHandle);
         toast.success('Files synced successfully');
       } catch (error) {

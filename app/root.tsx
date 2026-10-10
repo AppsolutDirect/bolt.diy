@@ -25,9 +25,12 @@ export const links: LinksFunction = () => [
     href: '/favicon.svg',
     type: 'image/svg+xml',
   },
+  { rel: 'manifest', href: '/manifest.json' },
+  { rel: 'apple-touch-icon', href: '/icons/apple-touch-icon.png' },
   { rel: 'stylesheet', href: reactToastifyStyles },
   { rel: 'stylesheet', href: tailwindReset },
   { rel: 'stylesheet', href: globalStyles },
+  { rel: 'stylesheet', href: mobilePerformanceStyles },
   { rel: 'stylesheet', href: xtermStyles },
   {
     rel: 'preconnect',
@@ -62,6 +65,8 @@ export const Head = createHead(() => (
   <>
     <meta charSet="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-visual" />
+    <meta name="theme-color" content="#1e2327" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <Meta />
     <Links />
     <script dangerouslySetInnerHTML={{ __html: inlineThemeCode }} />
@@ -74,6 +79,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     document.querySelector('html')?.setAttribute('data-theme', theme);
   }, [theme]);
+
+  // PWA: Service Worker registrieren und bei einer neuen Version einmal neu laden
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) {
+      return undefined;
+    }
+
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloading = false;
+
+    const onControllerChange = () => {
+      // Beim allerersten Installieren nicht neu laden, nur bei einem Update
+      if (hadController && !reloading) {
+        reloading = true;
+        window.location.reload();
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+    navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+
+    return () => navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+  }, []);
 
   return (
     <>
@@ -112,6 +140,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 import { logStore } from './lib/stores/logs';
 import { themeStore } from './lib/stores/theme';
 import globalStyles from './styles/index.scss?url';
+import mobilePerformanceStyles from './styles/mobile-performance.css?url';
 import { stripIndents } from './utils/stripIndent';
 
 export default function App() {

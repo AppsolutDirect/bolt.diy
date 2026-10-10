@@ -20,7 +20,7 @@ const menuVariants = {
   closed: {
     opacity: 0,
     visibility: 'hidden',
-    left: '-100vw',
+    x: '-100%',
     transition: {
       duration: 0.2,
       ease: cubicEasingFn,
@@ -29,7 +29,7 @@ const menuVariants = {
   open: {
     opacity: 1,
     visibility: 'initial',
-    left: 0,
+    x: 0,
     transition: {
       duration: 0.2,
       ease: cubicEasingFn,
@@ -341,7 +341,7 @@ export const Menu = () => {
         variants={menuVariants}
         style={{ width: 'min(340px, 88vw)' }}
         className={classNames(
-          'flex selection-accent flex-col side-menu fixed top-0 h-full rounded-r-2xl',
+          'flex selection-accent flex-col side-menu fixed top-0 left-0 h-full rounded-r-2xl will-change-transform',
           'bg-white dark:bg-gray-950 border-r border-bolt-elements-borderColor',
           'shadow-sm text-sm',
           isSettingsOpen ? 'z-40' : 'z-sidebar',

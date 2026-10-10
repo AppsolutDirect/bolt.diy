@@ -1,0 +1,128 @@
+/*
+ * Leistungs-Optimierungen für Smartphones und Tablets (Bildschirmbreite unter 1024 px).
+ * Auf dem PC bleibt alles unverändert.
+ */
+@media (max-width: 1023px) {
+  /* Unschärfe hinter Flächen ist auf Handys sehr GPU-intensiv und lässt Scrollen ruckeln */
+  *,
+  *::before,
+  *::after {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Dekorative Hintergrund-Animationen (Strahlen, leuchtender Rahmen) ausschalten */
+  [class*='BackgroundRays'],
+  [class*='PromptEffectContainer'] {
+    display: none !important;
+  }
+
+  /* Kein graues Aufblitzen beim Tippen */
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/*
+ * Typografie der Chat-Antworten auf Smartphones und Tablets (unter 1024 px):
+ * etwas kleinere Schrift, damit mehr Text auf den Bildschirm passt, bei sauberen
+ * Abständen für Absätze, Überschriften, Listen und Code.
+ * Alle Größen sind relativ (rem/em) und skalieren mit der Schrifteinstellung des Geräts.
+ */
+@media (max-width: 1023px) {
+  [class*='MarkdownContent'] {
+    font-size: 0.875rem !important;
+    line-height: 1.5 !important;
+    overflow-wrap: break-word;
+  }
+
+  /* Abstand zwischen Absätzen und Blöcken */
+  [class*='MarkdownContent'] > *:not(:last-child) {
+    margin-block-end: 0.7em !important;
+  }
+
+  /* Überschriften: klar abgesetzt, aber nicht riesig */
+  [class*='MarkdownContent'] h1,
+  [class*='MarkdownContent'] h2,
+  [class*='MarkdownContent'] h3,
+  [class*='MarkdownContent'] h4,
+  [class*='MarkdownContent'] h5,
+  [class*='MarkdownContent'] h6 {
+    line-height: 1.25 !important;
+    margin-block: 0.9em 0.4em !important;
+  }
+
+  [class*='MarkdownContent'] h1 {
+    font-size: 1.35em !important;
+  }
+
+  [class*='MarkdownContent'] h2 {
+    font-size: 1.2em !important;
+  }
+
+  [class*='MarkdownContent'] h3 {
+    font-size: 1.1em !important;
+  }
+
+  [class*='MarkdownContent'] h4,
+  [class*='MarkdownContent'] h5,
+  [class*='MarkdownContent'] h6 {
+    font-size: 1em !important;
+  }
+
+  /* Listen */
+  [class*='MarkdownContent'] ul,
+  [class*='MarkdownContent'] ol {
+    padding-inline-start: 1.3em !important;
+  }
+
+  [class*='MarkdownContent'] li + li {
+    margin-top: 0.25em !important;
+  }
+
+  [class*='MarkdownContent'] li > p {
+    margin: 0 !important;
+  }
+
+  /* Code-Blöcke: kompakt, seitlich scrollbar statt abgeschnitten */
+  [class*='MarkdownContent'] pre {
+    font-size: 0.8125rem !important;
+    line-height: 1.45 !important;
+    padding: 0.6rem 0.75rem !important;
+    border-radius: 0.5rem !important;
+    max-width: 100%;
+    overflow-x: auto;
+    tab-size: 2;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  [class*='MarkdownContent'] pre code {
+    font-size: inherit !important;
+    line-height: inherit !important;
+  }
+
+  /* Code im Fließtext */
+  [class*='MarkdownContent'] :not(pre) > code {
+    font-size: 0.85em !important;
+    padding: 0.1em 0.35em !important;
+    border-radius: 0.3em !important;
+  }
+
+  /* Zitate, Tabellen, Bilder dürfen die Seite nicht breiter machen */
+  [class*='MarkdownContent'] blockquote {
+    margin-inline: 0 !important;
+    padding-inline-start: 0.75em !important;
+  }
+
+  [class*='MarkdownContent'] table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    font-size: 0.9em;
+  }
+
+  [class*='MarkdownContent'] img {
+    max-width: 100%;
+    height: auto;
+  }
+}
