@@ -250,7 +250,7 @@ export const ControlPanel = ({ open, onClose }: ControlPanelProps) => {
               </div>
               <div className="relative z-10 flex flex-col h-full">
                 {/* Header */}
-                <div className="flex items-center justify-between gap-2 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-2 gap-y-1 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-gray-700">
                   <div className="flex items-center space-x-2 sm:space-x-4 min-w-0">
                     {(activeTab || showTabManagement) && (
                       <button
@@ -274,9 +274,20 @@ export const ControlPanel = ({ open, onClose }: ControlPanelProps) => {
                     {/* Close Button */}
                     <button
                       onClick={handleClose}
-                      className="flex items-center justify-center w-11 h-11 sm:w-8 sm:h-8 shrink-0 rounded-full bg-transparent hover:bg-purple-500/10 dark:hover:bg-purple-500/20 group transition-all duration-200"
+                      className="hidden sm:flex items-center justify-center sm:w-8 sm:h-8 shrink-0 rounded-full bg-transparent hover:bg-purple-500/10 dark:hover:bg-purple-500/20 group transition-all duration-200"
                     >
                       <div className="i-ph:x w-6 h-6 sm:w-4 sm:h-4 text-gray-500 dark:text-gray-400 group-hover:text-purple-500 transition-colors" />
+                    </button>
+                  </div>
+
+                  {/* Schließen-Button (Handy): unter dem Titel, am linken Rand, weiß */}
+                  <div className="sm:hidden basis-full flex justify-start">
+                    <button
+                      onClick={handleClose}
+                      aria-label="Schließen"
+                      className="flex items-center justify-center w-11 h-11 -ml-2 rounded-full bg-gray-800 dark:bg-transparent hover:bg-purple-500/20 transition-colors duration-150"
+                    >
+                      <div className="i-ph:x w-6 h-6 text-white" />
                     </button>
                   </div>
                 </div>
